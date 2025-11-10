@@ -90,10 +90,15 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  char reg1, reg2, reg3;
-  reg1 = 0;
+  char reg1, reg2, reg3; //registers for tracking active "beats" of the synth track
+  reg1 = 0; //initialized to zero for empty track
   reg2 = 0;
   reg3 = 0;
+
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);   // PB15 = HIGH
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
   /* USER CODE END 2 */
 
   /* Infinite loop */
