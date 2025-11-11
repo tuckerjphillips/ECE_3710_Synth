@@ -91,7 +91,7 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   char reg1, reg2, reg3; //registers for tracking active "beats" of the synth track
-  reg1 = 0b00000001; //initialized to zero for empty track
+  reg1 = 0b11111111; //initialized to zero for empty track
   reg2 = 0;
   reg3 = 0;
   long int i = 0;
@@ -102,21 +102,33 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
 	  GPIOB->ODR = (0xFF << 8);
 
 
 	  GPIOB->ODR = ((reg1 & 0xFF) << 8);
 
 	  if (!(GPIOB->IDR & (1 << 1)) && (setBit == 0)) {
-		  reg1 ^= (1);
+		  reg1 ^= (1 << 7);
 		  setBit = 1;
+
 	  }
 
-	  if (i == 2147483){ //code for testing the LEDS
+	  if (i == 1147483){ //code for testing the LEDS
 		  i = 0;
 		  setBit = 0;
 		  reg1 = (reg1<<1) | (reg1>>(7)); //circular bitshift operation (rotate)
+
+		  if (!(reg1 & (1 << 7))){
+
+			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
+
+			  for (i=0; i<2147; i++){};
+
+			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+
+			  i = 0;
+		  }
+
 	  }
 	  i++;
     /* USER CODE END WHILE */
@@ -233,8 +245,11 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13
-                          |GPIO_PIN_14|GPIO_PIN_15|GPIO_PIN_5|GPIO_PIN_6
-                          |GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
+                          |GPIO_PIN_14|GPIO_PIN_15|GPIO_PIN_6|GPIO_PIN_7
+                          |GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -270,8 +285,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB5 PB6 PB7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
+  /*Configure GPIO pin : PB5 */
+  GPIO_InitStruct.Pin = GPIO_PIN_5;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB6 PB7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
