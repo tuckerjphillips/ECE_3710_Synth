@@ -91,20 +91,34 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   char reg1, reg2, reg3; //registers for tracking active "beats" of the synth track
-  reg1 = 0; //initialized to zero for empty track
+  reg1 = 0b00000001; //initialized to zero for empty track
   reg2 = 0;
   reg3 = 0;
-
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);   // PB15 = HIGH
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
+  long int i = 0;
+  char setBit = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+	  GPIOB->ODR = (0xFF << 8);
+
+
+	  GPIOB->ODR = ((reg1 & 0xFF) << 8);
+
+	  if (!(GPIOB->IDR & (1 << 1)) && (setBit == 0)) {
+		  reg1 ^= (1);
+		  setBit = 1;
+	  }
+
+	  if (i == 2147483){ //code for testing the LEDS
+		  i = 0;
+		  setBit = 0;
+		  reg1 = (reg1<<1) | (reg1>>(7)); //circular bitshift operation (rotate)
+	  }
+	  i++;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -235,8 +249,14 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB1 PB2 PB4 */
-  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_4;
+  /*Configure GPIO pin : PB1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB2 PB4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
