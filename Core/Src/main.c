@@ -91,11 +91,11 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   char reg1, reg2, reg3; //registers for tracking active "beats" of the synth track
-  reg1 = 0b11111111; //initialized to zero for empty track
+  reg1 = 0b11111111; //initialized to 1 for "empty" track
   reg2 = 0;
   reg3 = 0;
-  long int i = 0;
-  char setBit = 0;
+  long int i = 0; //counter bit (used for timing like systick) **tempory should be deleted later**
+  char setBit = 0; //bit to use as psuedo debouncer **tempory should be deleted later or updated to use for all button operations**
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -103,22 +103,19 @@ int main(void)
   while (1)
   {
 	  GPIOB->ODR = (0xFF << 8);
+	  GPIOB->ODR = ((reg1 & 0xFF) << 8); //set the LED GPIO's each bit
 
-
-	  GPIOB->ODR = ((reg1 & 0xFF) << 8);
-
-	  if (!(GPIOB->IDR & (1 << 1)) && (setBit == 0)) {
+	  if (!(GPIOB->IDR & (1 << 1)) && (setBit == 0)) { //If button is equal to 1 and the button has not been pressed this cycle update track
 		  reg1 ^= (1 << 7);
 		  setBit = 1;
-
 	  }
 
-	  if (i == 1147483){ //code for testing the LEDS
+	  if (i == 1147483){ //Ever 1147483 cycles (all code in this loop should be moved to systick when implemented)
 		  i = 0;
 		  setBit = 0;
-		  reg1 = (reg1<<1) | (reg1>>(7)); //circular bitshift operation (rotate)
+		  reg1 = (reg1<<1) | (reg1>>(7)); //do a circular bitshift operation (rotate) to move track forward 1
 
-		  if (!(reg1 & (1 << 7))){
+		  if (!(reg1 & (1 << 7))){ //If value of our track == 0 output a pulse to our first output voice
 
 			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
 
