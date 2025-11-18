@@ -40,6 +40,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim2;
+
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
@@ -50,8 +52,9 @@ UART_HandleTypeDef huart2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
-
+void Delay_us_TIM(TIM_HandleTypeDef *htim, uint16_t us);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -76,7 +79,9 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  int timer_initial=0;
+  int timer_final=0;
+  long int dist1=0, dist2=0;
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -89,6 +94,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   char reg1, reg2, reg3; //registers for tracking active "beats" of the synth track
   reg1 = 0b11111111; //initialized to 1 for "empty" track
@@ -102,6 +108,42 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  // The following lines sends a 10 microsecond pulse to the sensor, this is the sonar pulse that tells distance
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET); // turns on the trigger for the sensor
+	  Delay_us_TIM(&htim2, 10); // Leaves it on for 10 microseconds
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET); // Turns off the trigger for the sensor
+
+	  // The following lines receives a signal from the echo pin of the sensor, measuring how long it is
+	  __HAL_TIM_SET_COUNTER(&htim2, 0); // reset counter
+	  while (!(GPIOA->IDR & (1 << 1))); // Loops until echo is sending a signal for the first time
+	  timer_initial = __HAL_TIM_GET_COUNTER(&htim2); // This initializes the timer variable, tracking how long the pulse takes to get sent back
+	  while (GPIOA->IDR & (1 << 1)); // Loops until echo is no longer sending a signal
+	  timer_final = __HAL_TIM_GET_COUNTER(&htim2); // This is the final time
+
+	  // The following lines calculates the distance in millimeters
+	  dist1 = (timer_final - timer_initial) / 1600 * 1715 / 1000;
+	  Delay_us_TIM(&htim2, 10);
+
+	  // The following lines sends a 10 microsecond pulse to the sensor, this is the sonar pulse that tells distance
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // turns on the trigger for the sensor
+	  Delay_us_TIM(&htim2, 10); // Leaves it on for 10 microseconds
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // Turns off the trigger for the sensor
+
+	  // The following lines receives a signal from the echo pin of the sensor, measuring how long it is
+	  __HAL_TIM_SET_COUNTER(&htim2, 0); // reset counter
+	  while (!(GPIOA->IDR & (1 << 6))); // Loops until echo is sending a signal for the first time
+	  timer_initial = __HAL_TIM_GET_COUNTER(&htim2); // This initializes the timer variable, tracking how long the pulse takes to get sent back
+	  while (GPIOA->IDR & (1 << 6)); // Loops until echo is no longer sending a signal
+	  timer_final = __HAL_TIM_GET_COUNTER(&htim2); // This is the final time
+
+	  // The following lines calculates the distance in millimeters
+	  dist2 = (timer_final - timer_initial) / 1600 * 1715 / 1000;
+
+	  // The next few lines are where the theramin signal will be sent to the amp
+
+	  // end code to amp
+
+
 	  GPIOB->ODR = (0xFF << 8);
 	  GPIOB->ODR = ((reg1 & 0xFF) << 8); //set the LED GPIO's each bit
 
@@ -185,6 +227,51 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 4294967295;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -238,7 +325,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0|GPIO_PIN_4|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13
@@ -254,12 +341,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
+  /*Configure GPIO pins : PA0 PA4 LD2_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_4|LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PA1 PA6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PB1 */
   GPIO_InitStruct.Pin = GPIO_PIN_1;
@@ -302,7 +395,13 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void Delay_us_TIM(TIM_HandleTypeDef *htim, uint16_t us)
+{
+	us = 40 * us;
+    __HAL_TIM_SET_COUNTER(htim, 0);  // reset counter
+    while (__HAL_TIM_GET_COUNTER(htim) < us);
+    HAL_TIM_Base_Start(&htim2); // This starts the timer
+}
 /* USER CODE END 4 */
 
 /**
