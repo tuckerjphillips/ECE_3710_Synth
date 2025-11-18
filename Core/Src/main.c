@@ -60,14 +60,14 @@ void Delay_us_TIM(TIM_HandleTypeDef *htim, uint16_t us);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-char reg1, reg2, reg3, setBit; //registers for tracking active "beats" of the synth track
-
+volatile uint8_t reg1, reg2, reg3, setBit; //registers for tracking active "beats" of the synth track
+volatile uint8_t selectedReg;
 
 void HAL_SYSTICK_Callback(void)
 {
     // 1 ms timebase from HAL / SysTick
     static uint32_t ms_counter   = 0;
-    static uint32_t pulse_timer  = 0;
+    static uint32_t pulse_timer = 0;
 
     ms_counter++;
 
@@ -75,6 +75,8 @@ void HAL_SYSTICK_Callback(void)
     if (ms_counter >= 500)
     {
         ms_counter = 0;
+
+        if ((GPIOB->IDR & (1 << 1)) && (GPIOB->IDR & (1 << 2)) && (GPIOB->IDR & (1 << 4))) //buttons all are not pressed
         setBit = 0; // re-allow button press
 
         // Rotate all three tracks left (circular shift, 8 bits)
@@ -86,19 +88,31 @@ void HAL_SYSTICK_Callback(void)
         if ((reg1 & (1 << 7)) == 0)
         {
             HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
-            pulse_timer = 0;  // start pulse timing
         }
-    }
-
-    // Handle ~2 ms output pulse on PB5 (non-blocking)
-    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == GPIO_PIN_SET)
-    {
-        pulse_timer++;
-        if (pulse_timer >= 2)      // 2 ms @ 1 ms tick
+        // If MSB of reg2 is 0 → trigger a short pulse
+        if ((reg2 & (1 << 7)) == 0)
         {
-            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
+        }
+        // If MSB of reg3 is 0 → trigger a short pulse
+        if ((reg3 & (1 << 7)) == 0)
+        {
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
+        }
+
+        // Handle ~2 ms pulse on PB5/6/7
+        if ((GPIOB->ODR & ((1 << 5) | (1 << 6) | (1 << 7))) != 0) {
+            pulse_timer++;
+            if (pulse_timer >= 1000) {   // 2 ms @ 1ms tick
+                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+                pulse_timer = 0;
+            }
+        } else {
             pulse_timer = 0;
         }
+
     }
 }
 
@@ -138,9 +152,11 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  reg1 = 0b11111111; //initialized to 1 for "empty" track
-  reg2 = 0;
-  reg3 = 0;
+  reg1 = 0b11111111; //set all tracks to 1 to initialize them as empty
+  reg2 = 0b11111111;
+  reg3 = 0b11111111;
+  static int pulse_timer = 0;
+  selectedReg = 1;
   setBit = 0; //bit to use as psuedo debouncer **tempory should be deleted later or updated to use for all button operations**
   /* USER CODE END 2 */
 
@@ -148,7 +164,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  // The following lines sends a 10 microsecond pulse to the sensor, this is the sonar pulse that tells distance
+/*	  // The following lines sends a 10 microsecond pulse to the sensor, this is the sonar pulse that tells distance
 	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET); // turns on the trigger for the sensor
 	  Delay_us_TIM(&htim2, 10); // Leaves it on for 10 microseconds
 	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET); // Turns off the trigger for the sensor
@@ -177,20 +193,52 @@ int main(void)
 	  timer_final = __HAL_TIM_GET_COUNTER(&htim2); // This is the final time
 
 	  // The following lines calculates the distance in millimeters
-	  dist2 = (timer_final - timer_initial) / 1600 * 1715 / 1000;
+	  dist2 = (timer_final - timer_initial) / 1600 * 1715 / 1000;*/
 
 	  // The next few lines are where the theramin signal will be sent to the amp
 
 	  // end code to amp
 
-
-	  GPIOB->ODR = (0xFF << 8);
-	  GPIOB->ODR = ((reg1 & 0xFF) << 8); //set the LED GPIO's each bit
+	  if (selectedReg == 1) {
+		  GPIOB->ODR = (0xFF << 8);
+		  GPIOB->ODR = ((reg1 & 0xFF) << 8); //set the LED GPIO's each bit
+	  } else if (selectedReg == 2) {
+		  GPIOB->ODR = (0xFF << 8);
+		  GPIOB->ODR = ((reg2 & 0xFF) << 8); //set the LED GPIO's each bit
+	  } else if (selectedReg == 3) {
+		  GPIOB->ODR = (0xFF << 8);
+		  GPIOB->ODR = ((reg3 & 0xFF) << 8); //set the LED GPIO's each bit
+	  }
 
 	  if (!(GPIOB->IDR & (1 << 1)) && (setBit == 0)) { //If button is equal to 1 and the button has not been pressed this cycle update track
-		  reg1 ^= (1 << 7);
+		  if (selectedReg == 1) {
+			  reg1 ^= (1 << 7);
+		  } else if (selectedReg == 2) {
+			  reg2 ^= (1 << 7);
+		  } else if (selectedReg == 3) {
+			  reg3 ^= (1 << 7);
+		  }
 		  setBit = 1;
 	  }
+
+	  if (!(GPIOB->IDR & (1 << 2)) && (setBit == 0)) { //reset tracks button logic
+		  setBit = 1;
+		  reg1 = 0b11111111;
+		  reg2 = 0b11111111;
+		  reg3 = 0b11111111;
+	  }
+
+	  if (!(GPIOB->IDR & (1 << 4)) && (setBit == 0)) { //select register button logic
+		  	  setBit = 1;
+	  		  if (selectedReg != 3) {
+	  			selectedReg++;
+	  		  }
+	  		  else {
+	  			  selectedReg = 1;
+	  		  }
+	  	  }
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
