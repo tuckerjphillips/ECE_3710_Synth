@@ -60,6 +60,48 @@ void Delay_us_TIM(TIM_HandleTypeDef *htim, uint16_t us);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+char reg1, reg2, reg3, setBit; //registers for tracking active "beats" of the synth track
+
+
+void HAL_SYSTICK_Callback(void)
+{
+    // 1 ms timebase from HAL / SysTick
+    static uint32_t ms_counter   = 0;
+    static uint32_t pulse_timer  = 0;
+
+    ms_counter++;
+
+    // Every 500 ms: rotate tracks + allow a new button press
+    if (ms_counter >= 500)
+    {
+        ms_counter = 0;
+        setBit = 0; // re-allow button press
+
+        // Rotate all three tracks left (circular shift, 8 bits)
+        reg1 = (uint8_t)((reg1 << 1) | (reg1 >> 7));
+        reg2 = (uint8_t)((reg2 << 1) | (reg2 >> 7));
+        reg3 = (uint8_t)((reg3 << 1) | (reg3 >> 7));
+
+        // If MSB of reg1 is 0 → trigger a short pulse
+        if ((reg1 & (1 << 7)) == 0)
+        {
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
+            pulse_timer = 0;  // start pulse timing
+        }
+    }
+
+    // Handle ~2 ms output pulse on PB5 (non-blocking)
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == GPIO_PIN_SET)
+    {
+        pulse_timer++;
+        if (pulse_timer >= 2)      // 2 ms @ 1 ms tick
+        {
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+            pulse_timer = 0;
+        }
+    }
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -96,12 +138,10 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  char reg1, reg2, reg3; //registers for tracking active "beats" of the synth track
   reg1 = 0b11111111; //initialized to 1 for "empty" track
   reg2 = 0;
   reg3 = 0;
-  long int i = 0; //counter bit (used for timing like systick) **tempory should be deleted later**
-  char setBit = 0; //bit to use as psuedo debouncer **tempory should be deleted later or updated to use for all button operations**
+  setBit = 0; //bit to use as psuedo debouncer **tempory should be deleted later or updated to use for all button operations**
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -151,25 +191,6 @@ int main(void)
 		  reg1 ^= (1 << 7);
 		  setBit = 1;
 	  }
-
-	  if (i == 1147483){ //Ever 1147483 cycles (all code in this loop should be moved to systick when implemented)
-		  i = 0;
-		  setBit = 0;
-		  reg1 = (reg1<<1) | (reg1>>(7)); //do a circular bitshift operation (rotate) to move track forward 1
-
-		  if (!(reg1 & (1 << 7))){ //If value of our track == 0 output a pulse to our first output voice
-
-			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
-
-			  for (i=0; i<2147; i++){};
-
-			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
-
-			  i = 0;
-		  }
-
-	  }
-	  i++;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
