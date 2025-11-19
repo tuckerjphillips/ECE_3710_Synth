@@ -180,7 +180,7 @@ int main(void)
 	  timer_final = __HAL_TIM_GET_COUNTER(&htim2); // This is the final time
 
 	  // The following lines calculates the distance in millimeters
-	  dist1 = (timer_final - timer_initial) / 1600 * 1715 / 1000;
+	  dist1 = (timer_final - timer_initial) / 1600 * 1715 / 10;
 	  Delay_us_TIM(&htim2, 10);
 
 	  // The following lines sends a 10 microsecond pulse to the sensor, this is the sonar pulse that tells distance
@@ -199,7 +199,15 @@ int main(void)
 	  dist2 = (timer_final - timer_initial) / 1600 * 1715 / 1000;*/
 
 	  // The next few lines are where the theramin signal will be sent to the amp
-
+	  //if(dist1<40000){
+	  //	period = 1*dist1; // Calculate the new reload value
+	  //	pulse = period / 2; // Calculate the pulse value (50% duty cycle)
+	  //	__HAL_TIM_SET_AUTORELOAD(&htim3, period); // Change reload value
+	  //	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, pulse); // Change pulse value
+	  //	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // Turn on the PWM
+	  //} else{
+	  //	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1); // Turn off the PWM if the sensor is out of range
+	  //}
 	  // end code to amp
 
 	  if (selectedReg == 1) {
