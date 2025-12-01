@@ -62,15 +62,13 @@ void Delay_us_TIM(TIM_HandleTypeDef *htim, uint16_t us);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-volatile uint8_t reg1, reg2, reg3, setBit; //registers for tracking active "beats" of the synth track
-volatile uint8_t selectedReg;
+volatile uint8_t reg1, setBit;
+static int pulse_timer = 0;//registers for tracking active "beats" of the synth track
 
 void HAL_SYSTICK_Callback(void)
 {
     // 1 ms timebase from HAL / SysTick
     static uint32_t ms_counter   = 0;
-    static uint32_t pulse_timer = 0;
-
     ms_counter++;
 
     // Every 500 ms: rotate tracks + allow a new button press
@@ -78,37 +76,24 @@ void HAL_SYSTICK_Callback(void)
     {
         ms_counter = 0;
 
-        if ((GPIOB->IDR & (1 << 1)) && (GPIOB->IDR & (1 << 2)) && (GPIOB->IDR & (1 << 4))) //buttons all are not pressed
+        //buttons all are not pressed
         setBit = 0; // re-allow button press
 
         // Rotate all three tracks left (circular shift, 8 bits)
         reg1 = (uint8_t)((reg1 << 1) | (reg1 >> 7));
-        reg2 = (uint8_t)((reg2 << 1) | (reg2 >> 7));
-        reg3 = (uint8_t)((reg3 << 1) | (reg3 >> 7));
 
         // If MSB of reg1 is 0 → trigger a short pulse
         if ((reg1 & (1 << 7)) == 0)
         {
             HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
         }
-        // If MSB of reg2 is 0 → trigger a short pulse
-        if ((reg2 & (1 << 7)) == 0)
-        {
-            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
-        }
-        // If MSB of reg3 is 0 → trigger a short pulse
-        if ((reg3 & (1 << 7)) == 0)
-        {
-            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
-        }
+
 
         // Handle ~2 ms pulse on PB5/6/7
         if ((GPIOB->ODR & ((1 << 5) | (1 << 6) | (1 << 7))) != 0) {
             pulse_timer++;
-            if (pulse_timer >= 1000) {   // 2 ms @ 1ms tick
+            if (pulse_timer >= 2000) {   // 2 ms @ 1ms tick
                 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
-                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
-                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
                 pulse_timer = 0;
             }
         } else {
@@ -140,6 +125,7 @@ int main(void)
   int timer_initial=0;
   int timer_final=0;
   long int dist1=0, dist2=0;
+  long int period, pulse;
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -156,27 +142,24 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   reg1 = 0b11111111; //set all tracks to 1 to initialize them as empty
-  reg2 = 0b11111111;
-  reg3 = 0b11111111;
-  static int pulse_timer = 0;
-  selectedReg = 1;
   setBit = 0; //bit to use as psuedo debouncer **tempory should be deleted later or updated to use for all button operations**
+  HAL_TIM_Base_Start(&htim2); // This starts the timer
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-/*	  // The following lines sends a 10 microsecond pulse to the sensor, this is the sonar pulse that tells distance
+	  // The following lines sends a 10 microsecond pulse to the sensor, this is the sonar pulse that tells distance
 	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET); // turns on the trigger for the sensor
 	  Delay_us_TIM(&htim2, 10); // Leaves it on for 10 microseconds
 	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET); // Turns off the trigger for the sensor
 
 	  // The following lines receives a signal from the echo pin of the sensor, measuring how long it is
 	  __HAL_TIM_SET_COUNTER(&htim2, 0); // reset counter
-	  while (!(GPIOA->IDR & (1 << 1))); // Loops until echo is sending a signal for the first time
+	  while (!(GPIOA->IDR & (1 << 1))&& (__HAL_TIM_GET_COUNTER(&htim2) <= 5000000)); // Loops until echo is sending a signal for the first time
 	  timer_initial = __HAL_TIM_GET_COUNTER(&htim2); // This initializes the timer variable, tracking how long the pulse takes to get sent back
-	  while (GPIOA->IDR & (1 << 1)); // Loops until echo is no longer sending a signal
+	  while (GPIOA->IDR & (1 << 1) && (__HAL_TIM_GET_COUNTER(&htim2)-timer_initial <= 5000000)); // Loops until echo is no longer sending a signal
 	  timer_final = __HAL_TIM_GET_COUNTER(&htim2); // This is the final time
 
 	  // The following lines calculates the distance in millimeters
@@ -188,66 +171,38 @@ int main(void)
 	  Delay_us_TIM(&htim2, 10); // Leaves it on for 10 microseconds
 	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // Turns off the trigger for the sensor
 
-	  // The following lines receives a signal from the echo pin of the sensor, measuring how long it is
+	  /*// The following lines receives a signal from the echo pin of the sensor, measuring how long it is
 	  __HAL_TIM_SET_COUNTER(&htim2, 0); // reset counter
 	  while (!(GPIOA->IDR & (1 << 6))); // Loops until echo is sending a signal for the first time
 	  timer_initial = __HAL_TIM_GET_COUNTER(&htim2); // This initializes the timer variable, tracking how long the pulse takes to get sent back
 	  while (GPIOA->IDR & (1 << 6)); // Loops until echo is no longer sending a signal
 	  timer_final = __HAL_TIM_GET_COUNTER(&htim2); // This is the final time
 
-	  // The following lines calculates the distance in millimeters
+	   //The following lines calculates the distance in millimeters
 	  dist2 = (timer_final - timer_initial) / 1600 * 1715 / 1000;*/
 
-	  // The next few lines are where the theramin signal will be sent to the amp
-	  //if(dist1<40000){
-	  //	period = 1*dist1; // Calculate the new reload value
-	  //	pulse = period / 2; // Calculate the pulse value (50% duty cycle)
-	  //	__HAL_TIM_SET_AUTORELOAD(&htim3, period); // Change reload value
-	  //	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, pulse); // Change pulse value
-	  //	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // Turn on the PWM
-	  //} else{
-	  //	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1); // Turn off the PWM if the sensor is out of range
-	  //}
-	  // end code to amp
-
-	  if (selectedReg == 1) {
-		  GPIOB->ODR = (0xFF << 8);
-		  GPIOB->ODR = ((reg1 & 0xFF) << 8); //set the LED GPIO's each bit
-	  } else if (selectedReg == 2) {
-		  GPIOB->ODR = (0xFF << 8);
-		  GPIOB->ODR = ((reg2 & 0xFF) << 8); //set the LED GPIO's each bit
-	  } else if (selectedReg == 3) {
-		  GPIOB->ODR = (0xFF << 8);
-		  GPIOB->ODR = ((reg3 & 0xFF) << 8); //set the LED GPIO's each bit
+	  //The next few lines are where the theramin signal will be sent to the amp
+	  if(dist1<40000){
+	  	period = 1*dist1; // Calculate the new reload value
+	  	pulse = period / 2; // Calculate the pulse value (50% duty cycle)
+	  	__HAL_TIM_SET_AUTORELOAD(&htim3, period); // Change reload value
+	  	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, pulse); // Change pulse value
+	  	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // Turn on the PWM
+	  } else{
+	  	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1); // Turn off the PWM if the sensor is out of range
 	  }
+	  //end code to amp
+
+	  GPIOB->ODR = (0xFF << 8);
+	  GPIOB->ODR = ((reg1 & 0xFF) << 8); //set the LED GPIO's each bit
+
 
 	  if (!(GPIOB->IDR & (1 << 1)) && (setBit == 0)) { //If button is equal to 1 and the button has not been pressed this cycle update track
-		  if (selectedReg == 1) {
-			  reg1 ^= (1 << 7);
-		  } else if (selectedReg == 2) {
-			  reg2 ^= (1 << 7);
-		  } else if (selectedReg == 3) {
-			  reg3 ^= (1 << 7);
-		  }
+
+		  reg1 ^= (1 << 7);
+
 		  setBit = 1;
 	  }
-
-	  if (!(GPIOB->IDR & (1 << 2)) && (setBit == 0)) { //reset tracks button logic
-		  setBit = 1;
-		  reg1 = 0b11111111;
-		  reg2 = 0b11111111;
-		  reg3 = 0b11111111;
-	  }
-
-	  if (!(GPIOB->IDR & (1 << 4)) && (setBit == 0)) { //select register button logic
-		  	  setBit = 1;
-	  		  if (selectedReg != 3) {
-	  			selectedReg++;
-	  		  }
-	  		  else {
-	  			  selectedReg = 1;
-	  		  }
-	  	  }
 
 
     /* USER CODE END WHILE */
@@ -536,10 +491,10 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void Delay_us_TIM(TIM_HandleTypeDef *htim, uint16_t us)
 {
-	us = 40 * us;
+	HAL_TIM_Base_Start(htim); // This starts the timer
+	us = 80 * us;
     __HAL_TIM_SET_COUNTER(htim, 0);  // reset counter
     while (__HAL_TIM_GET_COUNTER(htim) < us);
-    HAL_TIM_Base_Start(&htim2); // This starts the timer
 }
 /* USER CODE END 4 */
 
