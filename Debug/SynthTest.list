@@ -392,7 +392,7 @@ void HAL_SYSTICK_Callback(void)
  8000502:	4b22      	ldr	r3, [pc, #136]	@ (800058c <HAL_SYSTICK_Callback+0x98>)
  8000504:	681b      	ldr	r3, [r3, #0]
  8000506:	f5b3 7ffa 	cmp.w	r3, #500	@ 0x1f4
- 800050a:	d33d      	bcc.n	8000588 <HAL_SYSTICK_Callback+0x94>
+ 800050a:	d33c      	bcc.n	8000586 <HAL_SYSTICK_Callback+0x92>
     {
         ms_counter = 0;
  800050c:	4b1f      	ldr	r3, [pc, #124]	@ (800058c <HAL_SYSTICK_Callback+0x98>)
@@ -443,46 +443,49 @@ void HAL_SYSTICK_Callback(void)
 
 
         // Handle ~2 ms pulse on PB5/6/7
-        if ((GPIOB->ODR & ((1 << 5) | (1 << 6) | (1 << 7))) != 0) {
+        if (((GPIOB->ODR & (1 << 5))/* | (GPIOB->ODR & (1 << 6)) | (GPIOB->ODR & (1 << 7))*/) != 0) {
  8000550:	4b11      	ldr	r3, [pc, #68]	@ (8000598 <HAL_SYSTICK_Callback+0xa4>)
  8000552:	695b      	ldr	r3, [r3, #20]
- 8000554:	f003 03e0 	and.w	r3, r3, #224	@ 0xe0
+ 8000554:	f003 0320 	and.w	r3, r3, #32
  8000558:	2b00      	cmp	r3, #0
- 800055a:	d012      	beq.n	8000582 <HAL_SYSTICK_Callback+0x8e>
-            pulse_timer++;
+ 800055a:	d011      	beq.n	8000580 <HAL_SYSTICK_Callback+0x8c>
+                    pulse_timer++;
  800055c:	4b0f      	ldr	r3, [pc, #60]	@ (800059c <HAL_SYSTICK_Callback+0xa8>)
  800055e:	681b      	ldr	r3, [r3, #0]
  8000560:	3301      	adds	r3, #1
  8000562:	4a0e      	ldr	r2, [pc, #56]	@ (800059c <HAL_SYSTICK_Callback+0xa8>)
  8000564:	6013      	str	r3, [r2, #0]
-            if (pulse_timer >= 1000) {   // 2 ms @ 1ms tick
+                    if (pulse_timer >= 200) {   // 2 ms @ 1ms tick
  8000566:	4b0d      	ldr	r3, [pc, #52]	@ (800059c <HAL_SYSTICK_Callback+0xa8>)
  8000568:	681b      	ldr	r3, [r3, #0]
- 800056a:	f5b3 7f7a 	cmp.w	r3, #1000	@ 0x3e8
- 800056e:	db0b      	blt.n	8000588 <HAL_SYSTICK_Callback+0x94>
-                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
- 8000570:	2200      	movs	r2, #0
- 8000572:	2120      	movs	r1, #32
- 8000574:	4808      	ldr	r0, [pc, #32]	@ (8000598 <HAL_SYSTICK_Callback+0xa4>)
- 8000576:	f000 ff85 	bl	8001484 <HAL_GPIO_WritePin>
-                pulse_timer = 0;
- 800057a:	4b08      	ldr	r3, [pc, #32]	@ (800059c <HAL_SYSTICK_Callback+0xa8>)
- 800057c:	2200      	movs	r2, #0
- 800057e:	601a      	str	r2, [r3, #0]
-        } else {
-            pulse_timer = 0;
-        }
+ 800056a:	2bc7      	cmp	r3, #199	@ 0xc7
+ 800056c:	dd0b      	ble.n	8000586 <HAL_SYSTICK_Callback+0x92>
+                        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+ 800056e:	2200      	movs	r2, #0
+ 8000570:	2120      	movs	r1, #32
+ 8000572:	4809      	ldr	r0, [pc, #36]	@ (8000598 <HAL_SYSTICK_Callback+0xa4>)
+ 8000574:	f000 ff86 	bl	8001484 <HAL_GPIO_WritePin>
+        /*                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+                        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);*/
+                        pulse_timer = 0;
+ 8000578:	4b08      	ldr	r3, [pc, #32]	@ (800059c <HAL_SYSTICK_Callback+0xa8>)
+ 800057a:	2200      	movs	r2, #0
+ 800057c:	601a      	str	r2, [r3, #0]
+                } else {
+                    pulse_timer = 0;
+                }
 
     }
 }
- 8000580:	e002      	b.n	8000588 <HAL_SYSTICK_Callback+0x94>
-            pulse_timer = 0;
- 8000582:	4b06      	ldr	r3, [pc, #24]	@ (800059c <HAL_SYSTICK_Callback+0xa8>)
- 8000584:	2200      	movs	r2, #0
- 8000586:	601a      	str	r2, [r3, #0]
+ 800057e:	e002      	b.n	8000586 <HAL_SYSTICK_Callback+0x92>
+                    pulse_timer = 0;
+ 8000580:	4b06      	ldr	r3, [pc, #24]	@ (800059c <HAL_SYSTICK_Callback+0xa8>)
+ 8000582:	2200      	movs	r2, #0
+ 8000584:	601a      	str	r2, [r3, #0]
 }
- 8000588:	bf00      	nop
- 800058a:	bd80      	pop	{r7, pc}
+ 8000586:	bf00      	nop
+ 8000588:	bd80      	pop	{r7, pc}
+ 800058a:	bf00      	nop
  800058c:	20000150 	.word	0x20000150
  8000590:	20000149 	.word	0x20000149
  8000594:	20000148 	.word	0x20000148

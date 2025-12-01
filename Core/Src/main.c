@@ -90,15 +90,17 @@ void HAL_SYSTICK_Callback(void)
 
 
         // Handle ~2 ms pulse on PB5/6/7
-        if ((GPIOB->ODR & ((1 << 5) | (1 << 6) | (1 << 7))) != 0) {
-            pulse_timer++;
-            if (pulse_timer >= 2000) {   // 2 ms @ 1ms tick
-                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
-                pulse_timer = 0;
-            }
-        } else {
-            pulse_timer = 0;
-        }
+        if (((GPIOB->ODR & (1 << 5))/* | (GPIOB->ODR & (1 << 6)) | (GPIOB->ODR & (1 << 7))*/) != 0) {
+                    pulse_timer++;
+                    if (pulse_timer >= 200) {   // 2 ms @ 1ms tick
+                        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+        /*                HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+                        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);*/
+                        pulse_timer = 0;
+                    }
+                } else {
+                    pulse_timer = 0;
+                }
 
     }
 }
