@@ -126,7 +126,7 @@ int main(void)
   /* USER CODE BEGIN Init */
   int timer_initial=0;
   int timer_final=0;
-  long int dist1=0, dist2=0;
+  long int dist1=0, no_dist=0;
   long int period, pulse;
   /* USER CODE END Init */
 
@@ -159,29 +159,23 @@ int main(void)
 
 	  // The following lines receives a signal from the echo pin of the sensor, measuring how long it is
 	  __HAL_TIM_SET_COUNTER(&htim2, 0); // reset counter
-	  while (!(GPIOA->IDR & (1 << 1))&& (__HAL_TIM_GET_COUNTER(&htim2) <= 5000000)); // Loops until echo is sending a signal for the first time
+	  while (!(GPIOA->IDR & (1 << 1)) && (__HAL_TIM_GET_COUNTER(&htim2) <= 5000000)); // Loops until echo is sending a signal for the first time
+	  if (__HAL_TIM_GET_COUNTER(&htim2) > 5000000){ // This checks if the IDR was ever actually set
+		  no_dist = 1;
+	  }
 	  timer_initial = __HAL_TIM_GET_COUNTER(&htim2); // This initializes the timer variable, tracking how long the pulse takes to get sent back
+
 	  while (GPIOA->IDR & (1 << 1) && (__HAL_TIM_GET_COUNTER(&htim2)-timer_initial <= 5000000)); // Loops until echo is no longer sending a signal
+	  if (__HAL_TIM_GET_COUNTER(&htim2)-timer_initial > 5000000){ // This checks if the IDR was ever actually reset
+		  no_dist = 1;
+	  }
 	  timer_final = __HAL_TIM_GET_COUNTER(&htim2); // This is the final time
 
 	  // The following lines calculates the distance in millimeters
-	  dist1 = (timer_final - timer_initial) / 1600 * 1715 / 10;
-	  Delay_us_TIM(&htim2, 10);
-
-	  // The following lines sends a 10 microsecond pulse to the sensor, this is the sonar pulse that tells distance
-	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // turns on the trigger for the sensor
-	  Delay_us_TIM(&htim2, 10); // Leaves it on for 10 microseconds
-	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // Turns off the trigger for the sensor
-
-	  /*// The following lines receives a signal from the echo pin of the sensor, measuring how long it is
-	  __HAL_TIM_SET_COUNTER(&htim2, 0); // reset counter
-	  while (!(GPIOA->IDR & (1 << 6))); // Loops until echo is sending a signal for the first time
-	  timer_initial = __HAL_TIM_GET_COUNTER(&htim2); // This initializes the timer variable, tracking how long the pulse takes to get sent back
-	  while (GPIOA->IDR & (1 << 6)); // Loops until echo is no longer sending a signal
-	  timer_final = __HAL_TIM_GET_COUNTER(&htim2); // This is the final time
-
-	   //The following lines calculates the distance in millimeters
-	  dist2 = (timer_final - timer_initial) / 1600 * 1715 / 1000;*/
+	  if (!no_dist){ // If the IDR was never actually set, then the following never runs
+		  dist1 = (timer_final - timer_initial) / 1600 * 1715 / 10;
+	  }
+	  no_dist = 0;
 
 	  //The next few lines are where the theramin signal will be sent to the amp
 	  if(dist1<40000){
